@@ -1,0 +1,166 @@
+//This macro divides the cell in two halves and counts area of the particles in each half.
+//Requires plugin "Measure ROI" to be installed.
+//Requires v1.5a.
+//Developed by Manasi Gangan, IISER Pune on 2016/01/09.
+
+//Extracts cell shape.
+selectWindow("Image1.tif");
+getDimensions(width, height, channels, slices, frames);
+//run("Enhance Contrast..."â "saturated=0.4 normalize");
+run("Enhance Contrast...", "saturated=0.4 normalize");
+run("Unsharp Mask...", "radius=5 mask=0.90");
+run("Unsharp Mask...", "radius=5 mask=0.90");
+setAutoThreshold("Otsu dark");
+//run("Threshold...");
+//setThreshold(128, 255);
+setOption("BlackBackground", false);
+run("Convert to Mask");
+run("Convert to Mask");
+run("Fill Holes");
+run("Erode");
+run("Dilate");
+//run("Erode");
+//run("Dilate");
+//run("Erode");
+//run("Dilate");
+run("Analyze Particles...", "size=750 pixel add");
+
+//finds width, length and area of the cell and divides it into two halves.
+newImage("Output_1", "8-bit black", width, height, 1);
+selectWindow("Output_1");
+roiManager("Select", 0);
+run("Invert");
+run("Make Binary");
+run("Median...", "radius=5");
+run("Skeletonize");
+run("Analyze Particles...", "size=0 add");
+roiManager("Select", 1);
+List.setMeasurements;
+  x1 = List.getValue("FeretX");
+  y1 = List.getValue("FeretY");
+  length = List.getValue("Feret");
+  degrees = List.getValue("FeretAngle");
+//print(degrees);
+  if (degrees>90)
+     degrees -= 180; 
+  angle = degrees*PI/180;
+  x2 = x1 + cos(angle)*length;
+  y2 = y1 - sin(angle)*length;
+m1= (y1- y2)/(x1- x2);
+m2 = -1/ m1;
+m3 = atan(m2);
+m4 = atan(m1);
+
+roiManager("Select",0);
+run("Measure Roi");
+w = getResult("Roi_Width", 0); 
+l = getResult("Roi_Length", 0); 
+//print(w,l);
+selectWindow("Results"); 
+run("Close");
+
+List.setMeasurements;
+  //print(List.getList); // list all measurements;
+  xC = List.getValue("X");
+  yC = List.getValue("Y");
+ 
+x3 = xC + (w/2)*cos(m3);
+y3 = yC + (w/2)*sin(m3);
+x4 = xC - (w/2)*cos(m3);
+y4 = yC - (w/2)*sin(m3);
+
+x5 = x3 - (l/2)*cos(m4);
+y5 = y3 - (l/2)*sin(m4);
+x6 = x4 - (l/2)*cos(m4);
+y6 = y4 - (l/2)*sin(m4);
+
+x7 = x3 + (l/2)*cos(m4);
+y7 = y3 + (l/2)*sin(m4);
+x8 = x4 + (l/2)*cos(m4);
+y8 = y4 + (l/2)*sin(m4);
+
+makePolygon(x3, y3, x4, y4, x6, y6,x5,y5);
+roiManager("Add");
+makePolygon(x3, y3, x4, y4, x8, y8,x7,y7);
+roiManager("Add");
+
+//Quntifies the area of the fluorecesent puncta in each half of the cell.
+selectWindow("Image2.tif");
+roiManager("Select",2);
+run("Duplicate...", " ");
+run("Subtract...", "value=50");
+run("Unsharp Mask...", "radius=5 mask=0.90");
+setAutoThreshold("Otsu dark");
+//run("Threshold...");
+//setThreshold(109, 255);
+run("Convert to Mask");
+run("Convert to Mask");
+run("Analyze Particles...", "size=0.07 display clear");
+N = nResults;
+selectWindow("Results");
+N=0;
+total_area_Left=0;
+for (a=0; a<nResults(); a++) {
+    total_area_Left = total_area_Left + getResult("Area",a);
+}
+//print (total_area_Left);
+
+selectWindow("Results");
+run("Close"); 
+
+selectWindow("Image2.tif");
+roiManager("Select",3);
+run("Duplicate...", " ");
+run("Subtract...", "value=50");
+run("Unsharp Mask...", "radius=5 mask=0.90");
+setAutoThreshold("Otsu dark");
+//run("Threshold...");
+//setThreshold(109, 255);
+run("Convert to Mask");
+run("Convert to Mask");
+run("Analyze Particles...", "size=0.07 display clear");
+N = nResults;
+selectWindow("Results");
+N=0;
+total_area_Right=0;
+for (a=0; a<nResults(); a++) {
+    total_area_Right = total_area_Right + getResult("Area",a);
+}
+//print (total_area_Right);
+
+selectWindow("Results");
+run("Close");
+
+
+selectWindow("Image2.tif");
+roiManager("Select",0);
+run("Measure");
+A = getResult("Area", 0);
+//print(A);
+selectWindow("Results");
+run("Close"); 
+run("Measure Roi");
+w1 = getResult("Roi_Width", 0); 
+l1 = getResult("Roi_Length", 0); 
+//print(w1,l1);
+selectWindow("Results"); 
+run("Close");
+
+LR1 = total_area_Left/A;
+RR1 = total_area_Right/A;
+
+LR2 = total_area_Left/l1;
+RR2 = total_area_Right/l1;
+
+setResult("Area", 0, A);
+setResult("Width", 0, w1);
+setResult("Length", 0, l1);
+setResult("Left", 0, total_area_Left);
+setResult("Right", 0, total_area_Right);
+setResult("LRatio1", 0, LR1);
+setResult("RRatio1", 0, RR1);
+setResult("LRatio2", 0, LR2);
+setResult("Rratio2", 0, RR2);
+
+selectWindow("Image2.tif");
+makeLine(x3, y3, x4, y4);
